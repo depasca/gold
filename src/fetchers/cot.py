@@ -39,12 +39,17 @@ def _to_int(row: dict, key: str) -> int:
 
 def fetch_cot() -> COTSnapshot:
     """Fetch last two weekly COT reports for COMEX gold from CFTC."""
-    params = {
-        "market_and_exchange_names": GOLD_MARKET,
-        "$order": "as_of_date_in_form_yymmdd DESC",
-        "$limit": "2",
-    }
-    resp = requests.get(CFTC_ENDPOINT, params=params, timeout=20)
+    # Build URL with literal $-prefixed Socrata params — requests.get(params=...)
+    # percent-encodes $ → %24, which Socrata rejects with a 400.
+    from urllib.parse import quote
+    market_enc = quote(GOLD_MARKET, safe="")
+    url = (
+        f"{CFTC_ENDPOINT}"
+        f"?market_and_exchange_names={market_enc}"
+        f"&$order=report_date_as_yyyy_mm_dd+DESC"
+        f"&$limit=2"
+    )
+    resp = requests.get(url, timeout=20)
     resp.raise_for_status()
     rows: list[dict] = resp.json()
 
@@ -67,7 +72,7 @@ def fetch_cot() -> COTSnapshot:
         net_change = noncomm_net - prev_net
 
     return {
-        "report_date": latest.get("as_of_date_in_form_yymmdd", "unknown"),
+        "report_date": latest.get("report_date_as_yyyy_mm_dd", "unknown"),
         "open_interest": _to_int(latest, "open_interest_all"),
         "noncomm_long": noncomm_long,
         "noncomm_short": noncomm_short,

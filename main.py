@@ -59,13 +59,13 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def run(mode: str) -> None:
+def run(mode: str = "light") -> None:
     log.info("=== Gold intelligence pipeline starting (mode=%s) ===", mode)
 
     log.info("Fetching gold price...")
     price = fetch_price()
     log.info(
-        "Gold spot: $%,.2f  |  24h: %+.2f%%  |  7d: %+.2f%%",
+        "Gold spot: $%.2f  |  24h: %+.2f%%  |  7d: %+.2f%%",
         price["current"],
         price["change_pct_24h"],
         price["change_7d_pct"],
@@ -101,13 +101,15 @@ def run(mode: str) -> None:
     if mode == "light":
         log.info("Running rule-based scoring (light mode)...")
         from src.analysis.rules import score as analyze_fn
-    else:
+    elif mode == "api":
         log.info("Running LLM analysis (Claude claude-opus-4-6)...")
         from src.analysis.llm import analyze as analyze_fn  # type: ignore[assignment]
-
+    else:
+        raise ValueError(f"Unsupported mode: {mode}")
+    
     rec = analyze_fn(price, signals, news, cot)
     log.info(
-        "Recommendation: %s  |  Outlook: %s  |  Confidence: %d%%  |  7d: $%,.0f – $%,.0f",
+        "Recommendation: %s  |  Outlook: %s  |  Confidence: %d%%  |  7d: $%.0f – $%.0f",
         rec["recommendation"].upper(),
         rec["price_outlook"],
         rec["confidence"],
@@ -122,8 +124,11 @@ def run(mode: str) -> None:
 
 if __name__ == "__main__":
     args = _parse_args()
+    mode = "light"
+    if args.mode:
+        mode = args.mode
     try:
-        run(args.mode)
+        run(mode)
     except Exception:
         log.exception("Pipeline failed")
         sys.exit(1)
