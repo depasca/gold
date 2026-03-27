@@ -2,7 +2,9 @@
 """Gold market intelligence pipeline — cron entry point.
 
 Run manually:
-    python main.py
+    python main.py              # API mode (Claude LLM, default)
+    python main.py --mode=api   # same as above
+    python main.py --mode=light # rule-based scoring, no API key needed
 
 Add to crontab for daily execution at 06:00 UTC:
     0 6 * * * /path/to/gold/.venv/bin/python /path/to/gold/main.py
@@ -10,6 +12,7 @@ Add to crontab for daily execution at 06:00 UTC:
 
 from __future__ import annotations
 
+import argparse
 import logging
 import sys
 from pathlib import Path
@@ -18,7 +21,6 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent / ".env")
 
-from src.analysis.llm import analyze
 from src.analysis.signals import compute_signals
 from src.fetchers.cot import COTSnapshot, fetch_cot
 from src.fetchers.news import fetch_news
@@ -46,8 +48,19 @@ _EMPTY_COT: COTSnapshot = {
 }
 
 
-def run() -> None:
-    log.info("=== Gold intelligence pipeline starting ===")
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Gold market intelligence pipeline")
+    parser.add_argument(
+        "--mode",
+        choices=["api", "light"],
+        default="api",
+        help="Analysis mode: 'api' uses Claude LLM (default), 'light' uses rule-based scoring",
+    )
+    return parser.parse_args()
+
+
+def run(mode: str) -> None:
+    log.info("=== Gold intelligence pipeline starting (mode=%s) ===", mode)
 
     log.info("Fetching gold price...")
     price = fetch_price()
@@ -85,8 +98,14 @@ def run() -> None:
         signals["momentum_signal"],
     )
 
-    log.info("Running LLM analysis (Claude claude-opus-4-6)...")
-    rec = analyze(price, signals, news, cot)
+    if mode == "light":
+        log.info("Running rule-based scoring (light mode)...")
+        from src.analysis.rules import score as analyze_fn
+    else:
+        log.info("Running LLM analysis (Claude claude-opus-4-6)...")
+        from src.analysis.llm import analyze as analyze_fn  # type: ignore[assignment]
+
+    rec = analyze_fn(price, signals, news, cot)
     log.info(
         "Recommendation: %s  |  Outlook: %s  |  Confidence: %d%%  |  7d: $%,.0f – $%,.0f",
         rec["recommendation"].upper(),
@@ -102,8 +121,9 @@ def run() -> None:
 
 
 if __name__ == "__main__":
+    args = _parse_args()
     try:
-        run()
+        run(args.mode)
     except Exception:
         log.exception("Pipeline failed")
         sys.exit(1)

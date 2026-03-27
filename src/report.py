@@ -7,7 +7,7 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
-from src.analysis.llm import GoldRecommendation
+from src.analysis.types import GoldRecommendation
 from src.analysis.signals import TechnicalSignals
 from src.fetchers.cot import COTSnapshot
 from src.fetchers.news import NewsItem

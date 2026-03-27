@@ -6,10 +6,10 @@ import json
 import logging
 import os
 import re
-from typing import TypedDict
 
 import anthropic
 
+from src.analysis.types import GoldRecommendation
 from src.analysis.signals import TechnicalSignals
 from src.fetchers.cot import COTSnapshot
 from src.fetchers.news import NewsItem
@@ -18,17 +18,6 @@ from src.fetchers.price import PriceSnapshot
 log = logging.getLogger(__name__)
 
 MODEL = os.getenv("ANTHROPIC_MODEL", "claude-opus-4-6")
-
-
-class GoldRecommendation(TypedDict):
-    price_outlook: str       # bullish | neutral | bearish
-    confidence: int          # 0–100
-    recommendation: str      # buy | hold | sell
-    forecast_7d_low: float
-    forecast_7d_high: float
-    key_factors: list[str]
-    risks: list[str]
-    summary: str
 
 
 def _build_prompt(
